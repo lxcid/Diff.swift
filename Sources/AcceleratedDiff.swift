@@ -23,18 +23,42 @@ public protocol AcceleratedDiffable {
     var diffIdentifier: AnyHashable { get }
 }
 
+/// Used to track elements while diffing.
+/// We expect to keep a reference of entry, thus its declaration as (final) class.
 private final class Entry {
+}
+
+private struct Record {
+    let entry: Entry
+    var index: Int?
+    init(_ entry: Entry) {
+        self.entry = entry
+        self.index = nil
+    }
 }
 
 public extension Collection where Iterator.Element: Equatable & AcceleratedDiffable {
     public func acceleratedDiff(_ other: Self) -> AcceleratedDiff {
-        return Self.diffing(oldArray: self, newArray: other)!;
+        return Self.diffing(oldArray: self, newArray: other)!
     }
     
     // FIXME: (stan@trifia.com) Temporary returns nullable to satisfy the compiler. Remove nullable in the future…
     private static func diffing(oldArray: Self, newArray: Self) -> AcceleratedDiff? {
         // symbol table uses the old/new array `diffIdentifier` as the key and `Entry` as the value
-        var table = Dictionary<AnyHashable, Entry>();
+        var table = Dictionary<AnyHashable, Entry>()
+        
+        // pass 1
+        var newRecords = newArray.map { (element) -> Record in
+            let key = element.diffIdentifier
+            if let entry = table[key] {
+                // FIXME: (stan@trifia.com) entry.push(new: nil)
+                return Record(entry)
+            } else {
+                let entry = Entry()
+                // FIXME: (stan@trifia.com) entry.push(new: nil)
+                return Record(entry)
+            }
+        }
         
         return nil;
     }
