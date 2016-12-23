@@ -23,8 +23,19 @@ public protocol AcceleratedDiffable {
     var diffIdentifier: AnyHashable { get }
 }
 
+private final class Entry {
+}
+
 public extension Collection where Iterator.Element: Equatable & AcceleratedDiffable {
     public func acceleratedDiff(_ other: Self) -> AcceleratedDiff {
+        return Self.diffing(oldArray: self, newArray: other)!;
+    }
+    
+    // FIXME: (stan@trifia.com) Temporary returns nullable to satisfy the compiler. Remove nullable in the future…
+    private static func diffing(oldArray: Self, newArray: Self) -> AcceleratedDiff? {
+        // symbol table uses the old/new array `diffIdentifier` as the key and `Entry` as the value
+        var table = Dictionary<AnyHashable, Entry>();
         
+        return nil;
     }
 }
