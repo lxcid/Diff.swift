@@ -2,7 +2,7 @@ public struct AcceleratedDiff: DiffProtocol {
     public enum Element {
         case insert(at: Int)
         case delete(at: Int)
-        case update(at: Int)
+        case update(old: Int, new: Int)
         case move(from: Int, to: Int)
     }
     
@@ -79,11 +79,10 @@ private struct Record {
 
 public extension Collection where Iterator.Element: Equatable & AcceleratedDiffable {
     public func acceleratedDiff(_ other: Self) -> AcceleratedDiff {
-        return Self.diffing(oldArray: self, newArray: other)!
+        return Self.diffing(oldArray: self, newArray: other)
     }
     
-    // FIXME: (stan@trifia.com) Temporary returns nullable to satisfy the compiler. Remove nullable in the future…
-    private static func diffing(oldArray: Self, newArray: Self) -> AcceleratedDiff? {
+    private static func diffing(oldArray: Self, newArray: Self) -> AcceleratedDiff {
         var table = EntryTable()
         
         // pass 1
@@ -113,10 +112,7 @@ public extension Collection where Iterator.Element: Equatable & AcceleratedDiffa
             oldRecords[oldIndex].index = i
         }
         
-        var inserts = [Int]()
-        var deletes = [Int]()
-        var updates = [Int]()
-        var moves = [(from: Int, to: Int)]()
+        var elements = Array<AcceleratedDiff.Element>()
         
         // pass 4
         var runningOffset = 0
@@ -124,7 +120,7 @@ public extension Collection where Iterator.Element: Equatable & AcceleratedDiffa
             let deleteOffset = runningOffset
             // if the record index in the new array doesn't exist, its a delete
             if record.index == nil {
-                deletes.append(i)
+                elements.append(.delete(at: i))
                 runningOffset += 1
             }
             return deleteOffset;
@@ -139,18 +135,18 @@ public extension Collection where Iterator.Element: Equatable & AcceleratedDiffa
                 let n = newArray.itemOnStartIndex(advancedBy: i)
                 let o = oldArray.itemOnStartIndex(advancedBy: oldIndex)
                 if n != o {
-                    updates.append(oldIndex)
+                    elements.append(.update(old: oldIndex, new: i))
                 }
                 let deleteOffset = deleteOffsets[oldIndex]
                 if (oldIndex - deleteOffset + insertOffset) != i {
-                    moves.append((from: oldIndex, to: i))
+                    elements.append(.move(from: oldIndex, to: i))
                 }
             } else { // add to inserts if the opposing index is nil
-                inserts.append(i)
+                elements.append(.insert(at: i))
                 runningOffset += 1
             }
         }
         
-        return nil;
+        return AcceleratedDiff(elements: elements)
     }
 }
