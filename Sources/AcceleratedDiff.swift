@@ -94,6 +94,26 @@ public extension Collection where Iterator.Element: Equatable & AcceleratedDiffa
             return Record(entry)
         }
         
+        // pass 3
+        newRecords.enumerated().filter { $1.entry.occurOnBothSides }.forEach { (i, record) in
+            let entry = record.entry
+            assert(!entry.oldIndexes.isEmpty, "Old indexes is empty while iterating new item \(i). Should have nil")
+            guard let oldIndex = entry.oldIndexes.removeLast() else {
+                return
+            }
+            // if an item occurs in the new and old array, it is unique
+            // assign the index of new and old records to the opposite index (reverse lookup)
+            newRecords[i].index = oldIndex
+            oldRecords[oldIndex].index = i
+            
+            //assert(oldIndex < oldArray.count) // We don't need to assert this because Swift have safety checks when calling the 2 function below…
+            let n = newArray.itemOnStartIndex(advancedBy: i)
+            let o = oldArray.itemOnStartIndex(advancedBy: oldIndex)
+            if n != o {
+                entry.updated = true
+            }
+        }
+        
         return nil;
     }
 }
