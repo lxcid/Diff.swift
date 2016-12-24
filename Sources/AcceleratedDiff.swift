@@ -36,15 +36,21 @@ private final class Entry {
     var updated: Bool = false
     /// Returns `true` if the data occur on both sides, `false` otherwise
     var occurOnBothSides: Bool {
-        return self.newCounter > 0 && self.oldCounter > 0
+        return newCounter > 0 && oldCounter > 0
+    }
+    var hasOldIndexes: Bool {
+        return !oldIndexes.isEmpty
     }
     func push(new index: Int?) {
-        self.newCounter += 1
-        self.oldIndexes.append(index)
+        newCounter += 1
+        oldIndexes.append(index)
     }
     func push(old index: Int?) {
-        self.oldCounter += 1;
-        self.oldIndexes.append(index)
+        oldCounter += 1;
+        oldIndexes.append(index)
+    }
+    func popOldIndex() -> Int? {
+        return oldIndexes.removeLast()
     }
 }
 
@@ -97,20 +103,51 @@ public extension Collection where Iterator.Element: Equatable & AcceleratedDiffa
         // pass 3
         newRecords.enumerated().filter { $1.entry.occurOnBothSides }.forEach { (i, record) in
             let entry = record.entry
-            assert(!entry.oldIndexes.isEmpty, "Old indexes is empty while iterating new item \(i). Should have nil")
-            guard let oldIndex = entry.oldIndexes.removeLast() else {
+            assert(entry.hasOldIndexes, "Old indexes is empty while iterating new item \(i). Should have nil")
+            guard let oldIndex = entry.popOldIndex() else {
                 return
             }
             // if an item occurs in the new and old array, it is unique
             // assign the index of new and old records to the opposite index (reverse lookup)
             newRecords[i].index = oldIndex
             oldRecords[oldIndex].index = i
-            
-            //assert(oldIndex < oldArray.count) // We don't need to assert this because Swift have safety checks when calling the 2 function below…
-            let n = newArray.itemOnStartIndex(advancedBy: i)
-            let o = oldArray.itemOnStartIndex(advancedBy: oldIndex)
-            if n != o {
-                entry.updated = true
+        }
+        
+        var inserts = [Int]()
+        var deletes = [Int]()
+        var updates = [Int]()
+        var moves = [(from: Int, to: Int)]()
+        
+        // pass 4
+        var runningOffset = 0
+        let deleteOffsets = oldRecords.enumerated().map { (i, record) -> Int in
+            let deleteOffset = runningOffset
+            // if the record index in the new array doesn't exist, its a delete
+            if record.index == nil {
+                deletes.append(i)
+                runningOffset += 1
+            }
+            return deleteOffset;
+        }
+        
+        // pass 5
+        runningOffset = 0
+        newRecords.enumerated().forEach { (i, record) in
+            let insertOffset = runningOffset
+            if let oldIndex = record.index {
+                // note that an entry can be updated /and/ moved
+                let n = newArray.itemOnStartIndex(advancedBy: i)
+                let o = oldArray.itemOnStartIndex(advancedBy: oldIndex)
+                if n != o {
+                    updates.append(oldIndex)
+                }
+                let deleteOffset = deleteOffsets[oldIndex]
+                if (oldIndex - deleteOffset + insertOffset) != i {
+                    moves.append((from: oldIndex, to: i))
+                }
+            } else { // add to inserts if the opposing index is nil
+                inserts.append(i)
+                runningOffset += 1
             }
         }
         
